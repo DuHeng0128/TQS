@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use TQS, please cite the paper below."
+type: software
+title: "TQS: Trajectory Quality Score"
+version: 0.1.0
+repository-code: "https://github.com/DuHeng0128/TQS"
+url: "https://arxiv.org/abs/2610.13152"
+license: MIT
+authors:
+  - family-names: Li
+    given-names: Sida
+  - family-names: Liu
+    given-names: Yuanxin
+  - family-names: Li
+    given-names: Shicheng
+  - family-names: Yao
+    given-names: Linli
+  - family-names: Sun
+    given-names: Xu
+  - family-names: Bai
+    given-names: Haoli
+  - family-names: Li
+    given-names: Xiaohui
+preferred-citation:
+  type: article
+  title: "Quality, Not Just Outcome: A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning"
+  journal: "arXiv preprint arXiv:2610.13152"
+  year: 2026
+  url: "https://arxiv.org/abs/2610.13152"
+  authors:
+    - family-names: Li
+      given-names: Sida
+    - family-names: Liu
+      given-names: Yuanxin
+    - family-names: Li
+      given-names: Shicheng
+    - family-names: Yao
+      given-names: Linli
+    - family-names: Sun
+      given-names: Xu
+    - family-names: Bai
+      given-names: Haoli
+    - family-names: Li
+      given-names: Xiaohui

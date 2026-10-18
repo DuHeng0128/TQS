@@ -1,33 +1,16 @@
-"""split.py —  selection from the TQS-score table.
+"""Source-stratified Top/Bottom/Random selection from a TQS score table.
 
-Improvements over V1's split_tqs_shards.py:
+Inputs are supplied through --scores and --source-dir. The default recipe
+filters by success, true tokenized length, step count, and component coverage.
+Top/Bottom preserve task/repository diversity; Random samples within sources.
+The historical HCR quota is opt-in, not part of the default arXiv recipe.
 
-  1. Source-stratified sampling
-       V1 top1024 was 88% SWE_Smith / 1.9% R2E_Gym; bot was 41% R2E_Gym /
-       36% SWE_Smith. That confounds quality with data source.  fixes the
-       per-source quota to match the eligible pool's source mix, so the only
-       thing differing between top/bot/random is TQS, not the source.
-
-  2. HCR diversity quota in top-K
-       V1 top1024 had 99.9% ideal_pattern=True → mode collapse.  caps the
-       fraction at MAX_IDEAL_FRAC (default 0.92), reserving ≥8% slots for
-       ideal_pattern=False so the SFT signal is "high quality with varied
-       structure" instead of "this one binary shape".
-
-  3. Per-task / per-repo diversity (kept from V1)
-       Greedy three-pass: task-key first, repo-key second, fill by score.
-
-Inputs:
-  TQS/results/coderforge_scores.parquet     (from rerank.py)
-  Code_Trajectory/CoderForge-Preview/trajectories/*.parquet  (source rows)
-
-Outputs:
-  TQS/data/trajectories-TQS-32k-1k/{top_1k,bottom_1k,random_1k}/*.parquet
-  TQS/results/split_summary.json
+Outputs under --output-dir: top/, bottom/, random/, and split_summary.json.
 """
 
 from __future__ import annotations
 
+import argparse
 import glob
 import json
 import logging
@@ -50,8 +33,10 @@ TOP_K = 1024
 MAX_TRAJ_LEN = 32768
 RANDOM_SEED = 42
 
-# HCR diversity quota for top1k: ≥8% slots reserved for ideal_pattern=False.
-MAX_IDEAL_FRAC = 0.92
+# Optional historical HCR diversity quota for Top-K.
+# The arXiv sampler does not impose an HCR quota. Retain it as an opt-in
+# experiment for compatibility with earlier exploratory runs.
+MAX_IDEAL_FRAC = None
 
 # Per-task hard cap inside a single split — prevents Pass-3 fill from stacking
 # many runs of the same task once unique tasks are exhausted.
@@ -94,7 +79,7 @@ def select_diverse_in_source(
     if pool.empty or k <= 0:
         return pool.head(0)
 
-    pool = pool.sort_values(score_col, ascending=not descending).reset_index(drop=True)
+    pool = pool.sort_values([score_col, "trajectory_id"], ascending=[not descending, True]).reset_index(drop=True)
     parsed = pool["trajectory_id"].map(parse_task_repo)
     pool = pool.assign(
         task_key=parsed.map(lambda x: x[0]),
@@ -231,7 +216,26 @@ def stratified_select(
 # ───────────────────────────── pipeline ────────────────────────────────────
 
 def main() -> None:
+    global SCORES, SOURCE_DIR, OUT_BASE, TOP_K, MAX_TRAJ_LEN, RANDOM_SEED, MAX_IDEAL_FRAC
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description="Construct source-stratified Top/Bottom/Random TQS subsets")
+    parser.add_argument("--scores", required=True, help="Scored parquet from python -m tqs")
+    parser.add_argument("--source-dir", required=True, help="Directory containing source trajectory parquet shards")
+    parser.add_argument("--output-dir", type=Path, required=True, help="New output directory")
+    parser.add_argument("--k", type=int, default=1024, help="Number of trajectories per subset")
+    parser.add_argument("--max-tokens", type=int, default=32768)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max-ideal-frac", type=float, default=None, help="Optional historical HCR quota; disabled in the paper recipe")
+    args = parser.parse_args()
+    if args.k < 1 or args.max_tokens < 1:
+        parser.error("--k and --max-tokens must be positive")
+    if args.max_ideal_frac is not None and not 0 <= args.max_ideal_frac <= 1:
+        parser.error("--max-ideal-frac must be between zero and one")
+    if args.output_dir.exists() and any(args.output_dir.iterdir()):
+        parser.error("--output-dir must be empty to avoid mixing selections from different runs")
+    SCORES, SOURCE_DIR, OUT_BASE = args.scores, args.source_dir, args.output_dir
+    TOP_K, MAX_TRAJ_LEN, RANDOM_SEED = args.k, args.max_tokens, args.seed
+    MAX_IDEAL_FRAC = args.max_ideal_frac
 
     # Source map (filename prefix → source name)
     src_files = sorted(glob.glob(os.path.join(SOURCE_DIR, "*.parquet")))
@@ -252,7 +256,7 @@ def main() -> None:
 
     # Load scores
     s = pd.read_parquet(SCORES)
-    needed = {"trajectory_id", "tqs_score", "total_tokens", "m7_ideal_pattern"}
+    needed = {"trajectory_id", "tqs_score", "total_tokens", "total_steps", "tqs_coverage"}
     missing = needed - set(s.columns)
     if missing:
         raise RuntimeError(f"Score table missing columns: {missing}")
@@ -260,10 +264,15 @@ def main() -> None:
     e = s.dropna(subset=["trajectory_id", "tqs_score", "total_tokens"]).copy()
     e = e[e["trajectory_id"].isin(reward1)]
     e = e[e["total_tokens"] <= MAX_TRAJ_LEN]
+    e = e[(e["total_steps"] >= 3) & (e["tqs_coverage"] >= 4 / 7)]
+    if len(e) < TOP_K:
+        raise ValueError(f"Only {len(e)} eligible rows for k={TOP_K}. Supply true token counts and check coverage/length filters.")
     e["src"] = e["trajectory_id"].map(tid2src).fillna("OTHER")
-    e = e.sort_values("tqs_score", ascending=False).drop_duplicates("trajectory_id", keep="first").reset_index(drop=True)
+    e = e.sort_values(["tqs_score", "trajectory_id"], ascending=[False, True]).drop_duplicates("trajectory_id", keep="first").reset_index(drop=True)
 
     # Use False if ideal_pattern is missing — diversity quota then doesn't bite.
+    if "m7_ideal_pattern" not in e:
+        e["m7_ideal_pattern"] = False
     e["m7_ideal_pattern"] = e["m7_ideal_pattern"].fillna(False).astype(bool)
 
     logger.info("eligible pool: %d trajectories", len(e))
@@ -299,6 +308,9 @@ def main() -> None:
         idx = rng.choice(len(sub), size=n, replace=False)
         rnd_parts.append(sub.iloc[idx])
     rnd = pd.concat(rnd_parts, ignore_index=True)
+    for name, selected in [("top", top), ("bottom", bot), ("random", rnd)]:
+        if len(selected) != TOP_K:
+            raise ValueError(f"{name} selection has {len(selected)} rows instead of {TOP_K}; lower --k or inspect source quotas/task caps")
 
     # Reporting
     summary = {
@@ -315,7 +327,7 @@ def main() -> None:
             "ideal_pattern_rate": float(e["m7_ideal_pattern"].mean()),
         },
     }
-    for name, d in [("top1024", top), ("bot1024", bot), ("random1024", rnd)]:
+    for name, d in [(f"top{TOP_K}", top), (f"bottom{TOP_K}", bot), (f"random{TOP_K}", rnd)]:
         summary[name] = {
             "n": int(len(d)),
             "tqs_mean": float(d["tqs_score"].mean()),
@@ -329,14 +341,14 @@ def main() -> None:
     logger.info("\n%s", json.dumps(summary, indent=2, ensure_ascii=False))
 
     OUT_BASE.mkdir(parents=True, exist_ok=True)
-    with open(OUT_BASE.parent.parent / "results" / "split_summary.json", "w") as f:
+    with open(OUT_BASE / "split_summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
     # Materialise per-shard parquet rows
     target_dirs = {
-        "top_1k": (top, OUT_BASE / "top_1k"),
-        "bottom_1k": (bot, OUT_BASE / "bottom_1k"),
-        "random_1k": (rnd, OUT_BASE / "random_1k"),
+        "top": (top, OUT_BASE / "top"),
+        "bottom": (bot, OUT_BASE / "bottom"),
+        "random": (rnd, OUT_BASE / "random"),
     }
     for _, (_, p) in target_dirs.items():
         p.mkdir(parents=True, exist_ok=True)

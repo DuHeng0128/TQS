@@ -5,8 +5,8 @@ Changes vs V1 (motivated by V1 diagnostic on 38 K reward=1 / ≤32 K eligible po
   • Remove HCR as a weighted component
       V1 saw 99.9% of top1024 with ideal_pattern=True vs 15.1% in bot1024.
       The component is too binary and would mode-collapse the SFT data.
-      ideal_pattern is preserved as a *diagnostic* and is enforced as a
-      diversity *quota* during sampling instead of a TQS weight.
+      ideal_pattern is preserved as a diagnostic. An optional historical
+      diversity quota is available in the sampler, but disabled by default.
 
   • Add DPI (Dirty Pattern Indicator)
       Penalises trajectories with hard quality red flags from M1/M2/M10

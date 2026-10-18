@@ -1,187 +1,181 @@
-# Supplementary Code
+<div align="center">
 
-This directory contains the code for reproducing the experiments in the paper.
+# TQS
 
-```
-supplementary/
-├── tqs/          TQS scoring system
-├── training/        SFT training scripts (ms-swift / DeepSpeed / FSDP)
-├── evaluation/      OpenHands evaluation pipeline on SWE-bench Verified
-└── analysis/        Data analysis and statistics scripts
-```
+### Quality, Not Just Outcome
+**A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning**
 
----
+Sida Li · Yuanxin Liu · Shicheng Li · Linli Yao · Xu Sun · Haoli Bai · Xiao-Hui Li
 
-## 1. TQS (`tqs/`)
+**Findings of EMNLP 2026**
 
-Trajectory Quality Score — a composite quality metric for code-agent trajectories used to select SFT training data.
+[![arXiv](https://img.shields.io/badge/arXiv-2610.13152-b31b1b.svg)](https://arxiv.org/abs/2610.13152)
+[![Venue](https://img.shields.io/badge/Findings-EMNLP%202026-1f4b99.svg)](https://2026.emnlp.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-### Key files
+[Paper](https://arxiv.org/abs/2610.13152) · [Quick start](#quick-start) · [Results](#results) · [Scoring guide](docs/data-and-scoring.md) · [Citation](#citation)
 
-| File | Description |
-|------|-------------|
-| `tqs.py` | Core TQS formula: 7 components (OEC, IAC, DPI, PED, PSN, TTE, SCP) with default weights |
-| `trajectory_metrics/` | M1–M10 metric implementations + parsers for OpenHands / SWE-agent / CoderForge formats |
-| `rerank.py` | Re-rank an existing scored parquet with TQS weights (no re-running M1–M10) |
-| `split.py` | Split eligible pool into Top-K / Bottom-K / Random-K subsets for SFT |
-| `report.py` | Batch TQS scoring report for OpenHands trajectory directories |
+</div>
 
-### Quick start
+TQS scores the **process behind a successful coding-agent run**: how observations become focused, whether actions follow the stated intent, and how the agent edits, tests, and recovers. It uses event logs without an LLM judge and combines seven structural measures into a score in [0, 1].
 
-```bash
-# Score a directory of OpenHands JSON trajectories
-python tqs/report.py --workers 8
+<p align="center">
+  <img src="assets/overview.png" width="100%" alt="TQS compares focused and convergent trajectories with repetitive and unstable trajectories using three structural dimensions and a guardrail.">
+</p>
 
-# Re-rank an existing scored parquet
-python tqs/rerank.py \
-    --input path/to/coderforge_scores.parquet \
-    --output path/to/coderforge_scores.parquet
+## Highlights
 
-# Split eligible pool into Top/Bottom/Random subsets
-python tqs/split.py \
-    --scores path/to/coderforge_scores.parquet \
-    --top-k 1024 --bottom-k 1024 --random-k 1024
-```
+- **Process-aware selection.** On SWE-bench Verified, Top-TQS training reaches **27.6%** pass@1, versus **24.8%** for random selection and **21.8%** for bottom selection.
+- **Lightweight scoring.** The paper reports 43 ms per trajectory on one CPU worker; model training and sandbox execution are separate stages.
+- **Seven interpretable signals.** Missing components are excluded and the remaining weights are renormalized.
+- **A small starting point.** Score the included synthetic trajectory locally before preparing a corpus or setting up GPUs.
 
-### Component weights (default)
+The paper and reported results follow [arXiv:2610.13152v1](https://arxiv.org/html/2610.13152v1), released on October 9, 2026.
 
-| Component | Weight | Source metric |
-|-----------|--------|---------------|
-| OEC | 0.30 | M2 min_relative_entropy (inverted) |
-| IAC | 0.25 | M4 action_type_consistency |
-| DPI | 0.10 | M1+M2+M10 dirty pattern indicator |
-| PED | 0.10 | M5 post_error_diversity |
-| PSN | 0.10 | M6 psn_late |
-| TTE | 0.10 | M9 tte_score |
-| SCP | 0.05 | M10 scp |
+## Quick start
 
-### Supported trajectory formats
-
-- `openhands` — OpenHands parquet (role/content/tool_calls schema)
-- `openhands_json` — OpenHands action-based JSON (source/action/args schema)
-- `swe_agent` — SWE-agent `.traj` / JSON files
-- `coderforge` — CoderForge-Preview parquet (messages/reward schema)
-
----
-
-## 2. Training (`training/`)
-
-SFT training scripts for Qwen3 models using DeepSpeed ZeRO / FSDP with ms-swift.
-
-### Key files
-
-| File | Description |
-|------|-------------|
-| `train_4b.py` | Qwen3-4B SFT — 1 node × 8 × A800, DeepSpeed ZeRO-2, 128K context |
-| `train_14b.py` | Qwen3-14B SFT — 1 node × 8 × A800, DeepSpeed ZeRO-3 |
-| `train_32b.py` | Qwen3-32B SFT — 1 node × 8 × A800, FSDP |
-| `data_utils.py` | Dataset classes: `CoderForgeTokenizedDataset`, `PackedCoderForgeDataset` (multi-packing with boundary-aware position_ids) |
-| `trainer_utils.py` | `TokenNormalizedLossTrainer` — normalizes loss by token count rather than sequence count |
-| `launch_4b.sh` | Launch script for 4B training |
-| `launch_14b.sh` | Launch script for 14B training |
-| `launch_32b.sh` | Launch script for 32B training |
-| `configs/` | DeepSpeed ZeRO-2/3 and FSDP config JSON files |
-
-### Quick start
+Python 3.10 or newer is required. Scoring runs on CPU.
 
 ```bash
-# 4B model (8 GPUs)
-deepspeed --num_gpus=8 training/train_4b.py \
-    --model_name_or_path Qwen/Qwen3-4B \
-    --data_path path/to/top1024_trajectories.parquet \
-    --output_dir checkpoints/qwen3-4b-coderforge
+git clone https://github.com/DuHeng0128/TQS.git
+cd TQS
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
 
-# Or use the launch script
-bash training/launch_4b.sh
+python -m tqs \
+  --input examples/trajectory.json \
+  --output outputs/demo.jsonl
 ```
 
-### Hardware requirements
+On Windows, activate the environment with `.venv\Scripts\Activate.ps1`. The example is synthetic and demonstrates the input schema; its score is not a paper result.
 
-| Model | GPUs | Memory | Parallelism |
-|-------|------|--------|-------------|
-| Qwen3-4B | 8 × A800 (80GB) | ~160GB | DeepSpeed ZeRO-2 |
-| Qwen3-14B | 8 × A800 (80GB) | ~640GB | DeepSpeed ZeRO-3 |
-| Qwen3-32B | 8 × A800 (80GB) | ~640GB | FSDP |
+The output contains `tqs_score`, `tqs_coverage`, all seven `tqs_*` components, raw diagnostics, and a structural eligibility flag. Existing output files are not overwritten.
 
----
-
-## 3. Evaluation (`evaluation/`)
-
-OpenHands-based evaluation pipeline on SWE-bench Verified, using vLLM for model serving and Daytona for sandboxed code execution.
-
-### Key files
-
-| File | Description |
-|------|-------------|
-| `run_eval.py` | Main evaluation script — runs OpenHands agent on SWE-bench Verified instances via Daytona sandbox |
-| `run_swebench_eval.py` | Parallel SWE-bench harness runner — evaluates three prediction sets (base/top/random) concurrently |
-| `run_verify.py` | Verify a subset of instances for quick sanity checks |
-| `prefetch_swebench_images.py` | Pre-pull Docker images for all SWE-bench instances to avoid cold-start delays |
-| `scripts/` | vLLM launch scripts and OpenHands config files for each model variant |
-
-### Evaluation workflow
+### Score your data
 
 ```bash
-# Step 1: Start vLLM server
-bash evaluation/scripts/run_vllm_qwen3coder30b.sh
-
-# Step 2: Pre-fetch Docker images (optional but recommended)
-python evaluation/prefetch_swebench_images.py
-
-# Step 3: Run OpenHands agent on SWE-bench Verified
-export DAYTONA_API_KEY="your_api_key"
-python evaluation/run_eval.py --instances 500 --output-dir eval_results/
-
-# Step 4: Run SWE-bench harness to score predictions
-python evaluation/run_swebench_eval.py --workers 24
+python -m tqs \
+  --input /path/to/trajectory-shards \
+  --format coderforge \
+  --output outputs/scores.parquet \
+  --workers 4
 ```
 
-### Prerequisites
+Input can be JSON, JSONL, parquet, or a directory. Supported formats are `coderforge`, message-based `openhands`, event-based `openhands_json`, and `swe_agent`; `auto` handles common schemas. See the [data and scoring guide](docs/data-and-scoring.md) for details.
 
-- vLLM server running on `localhost:8000` (or configured port)
-- `DAYTONA_API_KEY` environment variable set
-- Docker available for SWE-bench sandbox containers
-- SWE-bench Verified dataset at `SWE-bench_Verified/data/`
+### Prepare training data
 
----
-
-## 4. Analysis (`analysis/`)
-
-Scripts for data statistics and result analysis used in the paper.
-
-| File | Description |
-|------|-------------|
-| `tqs_eval_report.py` | Compute TQS metrics (avg steps, OEC, PSN, SCP, PED, DPI, convergence ratio) across base/top/random trajectory sets |
-
-### Usage
+The released Top-TQS, Bottom-TQS, and Random selections are provided as three
+1,024-ID manifests. Convert the corresponding raw parquet trajectories and train:
 
 ```bash
-# TQS metrics report across three trajectory sets
-python analysis/tqs_eval_report.py --workers 8 --output results/tqs_report.json
+python training/prepare_dataset.py \
+  --source /path/to/source-trajectory-shards \
+  --ids training/splits/top.txt \
+  --output outputs/data/top.jsonl
+
+DATASET_PATH="$PWD/outputs/data/top.jsonl" bash training/train_lora.sh
 ```
 
----
+See [`training/`](training/README.md) for the Qwen3-Coder-30B-A3B LoRA configuration.
+Raw upstream data and model weights are not bundled.
 
-## Dependencies
-
-```
-torch >= 2.6
-transformers >= 4.50
-deepspeed >= 0.16
-flash-attn >= 2.8
-liger-kernel
-pandas
-numpy
-scipy
-pyarrow
-openhands (for evaluation)
-swebench (for evaluation harness)
-```
-
-Install core dependencies:
+To select new subsets from your own scores:
 
 ```bash
-pip install torch transformers deepspeed pandas numpy scipy pyarrow
-pip install flash-attn --no-build-isolation
-pip install liger-kernel
+python -m tqs.split \
+  --scores outputs/scores.parquet \
+  --source-dir /path/to/source-trajectory-shards \
+  --output-dir outputs/subsets \
+  --k 1024
 ```
+
+This creates `top/`, `bottom/`, `random/`, and `split_summary.json`. Selection uses passing trajectories, at least three steps, coverage of at least 4/7, and an actual tokenized length of at most 32,768. Supply tokenizer-derived `total_tokens` in the score input; character-count estimates are reported separately and are not used as a substitute.
+
+## How TQS works
+
+| Dimension | Component | Weight | Structural signal |
+| --- | --- | ---: | --- |
+| Information focus | OEC | 0.30 | Observation entropy collapse |
+| Information focus | PSN | 0.10 | Progressive scope narrowing |
+| Intent–action alignment | IAC | 0.25 | Agreement between stated intent and tool action |
+| Policy dynamics | TTE | 0.10 | Tool transition entropy |
+| Policy dynamics | SCP | 0.05 | Timing of the first substantive edit |
+| Policy dynamics | PED | 0.10 | Behavioral change after errors |
+| Guardrail | DPI | 0.10 | Early stopping, no edit, loops, and repeated errors |
+
+`compute_tqs` is also available as a Python API:
+
+```python
+from tqs import compute_tqs
+
+# raw_metrics is the dict returned by the metric registry.
+result = compute_tqs(raw_metrics)
+print(result["tqs_score"], result["components"])
+```
+
+TQS evaluates observable interaction structure. It does not verify that a patch addresses the underlying bug, and its parsers may need adaptation for other agent scaffolds.
+
+## Results
+
+Paper Table 3, SWE-bench Verified pass@1 (%). Each SFT condition uses 1,024 trajectories with the same Qwen3-Coder-30B-A3B-Instruct backbone and training recipe.
+
+| Selection | Easy | Medium | Hard | Overall |
+| --- | ---: | ---: | ---: | ---: |
+| Base, no SFT | 36.6 | 19.2 | 2.2 | 24.4 |
+| Random | 40.7 | 16.9 | 2.2 | 24.8 |
+| Bottom-TQS | 33.5 | 16.9 | 0.0 | 21.8 |
+| Shortest | 37.6 | 18.4 | 0.0 | 24.2 |
+| DPI only | 37.6 | 19.9 | 2.2 | 25.2 |
+| LLM judge, GPT-4o | **43.3** | **21.1** | **6.7** | **28.4** |
+| Top-TQS, length-matched | 40.7 | 20.7 | 4.4 | 27.0 |
+| **Top-TQS** | 42.3 | 20.3 | **6.7** | **27.6** |
+
+The LLM judge is 0.8 points higher overall; TQS offers a much cheaper selection stage. These are paper-reported, single-run SFT results, not measurements produced by the quick start.
+
+<p align="center">
+  <img src="assets/results.png" width="600" alt="Paper results comparing base, random, bottom-TQS, top-TQS and GPT-4o selection on overall and hard SWE-bench Verified tasks.">
+</p>
+
+<details>
+<summary><b>Same task and outcome, different processes</b></summary>
+
+<p align="center">
+  <img src="assets/case-study.png" width="100%" alt="Two successful runs on the same task: a focused 36-step run and an unstable 73-step run with interrupts.">
+</p>
+
+Both runs pass the task. The paper's example contrasts a 36-step run scoring 0.78 with a 73-step run scoring 0.42.
+
+</details>
+
+## Repository guide
+
+| Path | Purpose |
+| --- | --- |
+| [`tqs/`](tqs/) | Public scoring API, command-line tools, parsers, and metric implementations |
+| [`examples/`](examples/) | Small synthetic input for CPU scoring |
+| [`docs/data-and-scoring.md`](docs/data-and-scoring.md) | Schemas, token counts, component mapping, and selection |
+| [`training/`](training/) | Selection manifests, agent-data conversion, and 30B-A3B LoRA training |
+| [`evaluation/`](evaluation/) | OpenHands/Daytona runner, vLLM launchers, and SWE-bench verification |
+| [`tests/`](tests/) | CPU regression checks for the scoring and selection interfaces |
+
+## Citation
+
+```bibtex
+@article{li2026tqs,
+  title   = {Quality, Not Just Outcome: A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning},
+  author  = {Li, Sida and Liu, Yuanxin and Li, Shicheng and Yao, Linli and Sun, Xu and Bai, Haoli and Li, Xiaohui},
+  journal = {arXiv preprint arXiv:2610.13152},
+  year    = {2026},
+  note    = {Accepted to Findings of EMNLP 2026},
+  url     = {https://arxiv.org/abs/2610.13152}
+}
+```
+
+## License and contact
+
+Code is released under the [MIT License](LICENSE). Upstream datasets, model weights, and agent frameworks retain their own licenses. Paper figures are credited in [assets/README.md](assets/README.md).
+
+For questions, open a [GitHub issue](https://github.com/DuHeng0128/TQS/issues) or contact [Sida Li](mailto:lisida@stu.pku.edu.cn).

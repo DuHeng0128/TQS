@@ -1,0 +1,17 @@
+name: Bug report
+description: Report a reproducible problem with scoring, selection, or evaluation.
+body:
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and observed behavior
+      description: Include the exact command, traceback, and expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Minimal input and environment
+      description: Share a small synthetic example, input format, Python/package versions, and operating system.
+    validations:
+      required: true

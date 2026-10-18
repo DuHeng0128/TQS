@@ -45,6 +45,10 @@ class PSNMetric(BaseMetric):
                 from scipy.stats import kendalltau
                 indices = list(range(len(scope_slice)))
                 tau_val, p_val = kendalltau(indices, scope_slice)
+                # Constant file scope has no rank trend. scipy returns NaN;
+                # use a neutral score instead of propagating it into TQS.
+                if not np.isfinite(tau_val):
+                    return 0.0, 0.0, 1.0, "oscillating"
                 score = float(-tau_val)
                 if score > 0.3:
                     pattern = "converging"

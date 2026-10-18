@@ -1,19 +1,4 @@
-"""rerank.py — Recompute TQS-V2 over the V1 score table without rerunning M1–M10.
-
-The V1 scoring run wrote `Code_Trajectory/results/coderforge_scores.parquet`
-with one row per trajectory, containing every raw metric we need:
-
-    tqs_oec, tqs_iac, tqs_psn, tqs_tte, tqs_scp, tqs_ped       (V1 normalised)
-    m1_early_stop, m1_rbs_loop_fraction, m2_error_repeat_rate, m10_never_committed
-
-V2 keeps the same per-component normalisation as V1 (so we can reuse tqs_*
-columns directly), drops HCR, and adds a DPI component derived from M1/M2/M10.
-We renormalise over the components that are non-null per row, matching the
-fail-soft semantics of compute_tqs.
-
-Outputs:
-    TQS/results/coderforge_scores.parquet     (full table + tqs_score, tqs_dpi)
-"""
+"""Recompute TQS from normalized components and flat raw DPI diagnostics."""
 
 from __future__ import annotations
 
@@ -24,9 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from tqs import DEFAULT_WEIGHTS, _DPI_EARLY_STOP_PENALTY, _DPI_NEVER_COMMIT_PENALTY, \
+from .tqs import DEFAULT_WEIGHTS, _DPI_EARLY_STOP_PENALTY, _DPI_NEVER_COMMIT_PENALTY, \
     _DPI_LOOP_FRAC_SCALE, _DPI_LOOP_FRAC_CAP, _DPI_ERR_REPEAT_SCALE, _DPI_ERR_REPEAT_CAP
 
 logger = logging.getLogger(__name__)
@@ -82,8 +65,8 @@ def recompute(df: pd.DataFrame) -> pd.DataFrame:
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description="Recompute TQS V2 without rerunning M1-M10")
-    ap.add_argument("--input", default="/path/to/results/coderforge_scores.parquet")
-    ap.add_argument("--output", default="/path/to/tqs/results/coderforge_scores.parquet")
+    ap.add_argument("--input", required=True)
+    ap.add_argument("--output", required=True)
     args = ap.parse_args()
 
     inp = Path(args.input); out = Path(args.output)
@@ -97,7 +80,7 @@ def main():
     logger.info(f"Saved {out}")
 
     s = df["tqs_score"].dropna()
-    print("\n=== TQS-V2 distribution (full 413K) ===")
+    print("\n=== TQS distribution (input table) ===")
     print(f"n={len(s)}  mean={s.mean():.4f}  std={s.std():.4f}  min={s.min():.4f}  max={s.max():.4f}")
     print("percentiles:", {p: round(float(s.quantile(p/100)), 4) for p in [1, 5, 10, 25, 50, 75, 90, 95, 99]})
 

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trajectory-quality-score"
+version = "0.1.0"
+description = "Structural scoring of coding-agent trajectories (Findings of EMNLP 2026)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Sida Li"}]
+dependencies = ["numpy>=1.24", "scipy>=1.10", "pandas>=2.0", "pyarrow>=12"]
+
+[project.urls]
+Paper = "https://arxiv.org/abs/2610.13152"
+Repository = "https://github.com/DuHeng0128/TQS"
+Issues = "https://github.com/DuHeng0128/TQS/issues"
+
+[project.scripts]
+tqs = "tqs.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tqs*"]

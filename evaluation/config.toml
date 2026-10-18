@@ -1,0 +1,48 @@
+[core]
+workspace_base = "/tmp/openhands_workspace"
+max_iterations = 100
+runtime = "daytona"
+default_agent = "CodeActAgent"
+save_trajectory_path = "outputs/eval/trajectories"
+
+[llm]
+model = "openai/tqs-agent"
+base_url = "http://localhost:8005/v1"
+api_key = "dummy"
+native_tool_calling = true
+temperature = 0.2
+top_p = 0.8
+max_output_tokens = 16384
+caching_prompt = false
+timeout = 300
+num_retries = 3
+retry_min_wait = 5
+retry_max_wait = 60
+
+[agent]
+enable_browsing = false
+enable_llm_editor = true
+enable_editor = true
+enable_jupyter = false
+enable_cmd = true
+enable_think = true
+enable_finish = true
+enable_condensation_request = false
+enable_history_truncation = true
+enable_mcp = false
+
+[sandbox]
+runtime_container_image = "docker.openhands.dev/openhands/runtime:1.6.0-nikolaik"
+timeout = 300
+remote_runtime_init_timeout = 300
+remote_runtime_api_timeout = 300
+
+[security]
+confirmation_mode = false
+
+[condenser]
+type = "pipeline"
+condensers = [
+  { type = "observation_masking", attention_window = 25 },
+  { type = "amortized", keep_first = 2, max_size = 100 },
+]

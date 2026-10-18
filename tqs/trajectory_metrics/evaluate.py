@@ -30,17 +30,9 @@ from .parsers.openhands import OpenHandsParser
 from .parsers.coderforge import CoderForgeParser
 from .metrics import registry
 # Import all metrics to trigger registry.register() calls
-import metrics.m1_rbs   # noqa
-import metrics.m2_oec   # noqa
-import metrics.m3_fld   # noqa
-import metrics.m4_dcs   # noqa
-import metrics.m5_bus   # noqa
-import metrics.m6_psn   # noqa
-import metrics.m7_hcr   # noqa
-import metrics.m8_tgcr  # noqa
-import metrics.m9_tte   # noqa
-import metrics.m10_scp  # noqa
-from .tqs_old_version import compute_tqs
+from .metrics import m1_rbs, m2_oec, m3_fld, m4_dcs, m5_bus  # noqa: F401
+from .metrics import m6_psn, m7_hcr, m8_tgcr, m9_tte, m10_scp  # noqa: F401
+from ..tqs import compute_tqs
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +226,9 @@ def _compute_one(traj: ParsedTrajectory) -> dict:
     # TQS composite
     tqs = compute_tqs(all_metrics)
     result["tqs_score"] = tqs.get("tqs_score")
+    result["tqs_coverage"] = tqs["coverage"]
+    for component in ("oec", "iac", "dpi", "ped", "psn", "tte", "scp"):
+        result[f"tqs_{component}"] = tqs["components"].get(component)
 
     # Store full metric dicts as JSON strings in a separate dict (for series data)
     result["_full_metrics"] = all_metrics

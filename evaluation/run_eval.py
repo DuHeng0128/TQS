@@ -9,9 +9,9 @@ Usage:
 
 Prerequisites:
     1. vLLM server must be running:
-       bash run_vllm.sh
+       bash evaluation/serve.sh
     2. DAYTONA_API_KEY must be set
-    3. OpenHands installed (run from /path/to/eval/OpenHands or set PYTHONPATH)
+    3. OpenHands with Daytona support installed (or set OPENHANDS_ROOT)
 """
 
 import asyncio
@@ -27,14 +27,15 @@ from datetime import datetime
 
 import pandas as pd
 # Ensure OpenHands is importable
-sys.path.insert(0, '/path/to/eval/OpenHands')
+if os.getenv('OPENHANDS_ROOT'):
+    sys.path.insert(0, os.environ['OPENHANDS_ROOT'])
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-DATASET_PATH = '/path/to/eval/SWE-bench_Verified/data/test-00000-of-00001.parquet'
-CONFIG_FILE   = '/path/to/eval/config_qwen3_coder_30b.toml'
-OUTPUT_DIR    = '/path/to/eval/eval_results'
+DATASET_PATH = os.getenv('SWEBENCH_DATASET', 'data/SWE-bench_Verified/data/test-00000-of-00001.parquet')
+CONFIG_FILE = str(Path(__file__).resolve().parent / 'config.toml')
+OUTPUT_DIR = 'outputs/eval'
 
 # Model inference parameters (injected via config.toml / env)
 TEMPERATURE   = 0.2
@@ -276,8 +277,9 @@ async def run_evaluation(
 # CLI entry point
 # ---------------------------------------------------------------------------
 def main():
-    global CONFIG_FILE, PARSER_BASE_URL, PARSER_MODEL, PARSER_API_KEY
+    global CONFIG_FILE, DATASET_PATH, PARSER_BASE_URL, PARSER_MODEL, PARSER_API_KEY
     parser = argparse.ArgumentParser(description='Run SWE-bench evaluation with OpenHands+Daytona')
+    parser.add_argument('--dataset', default=DATASET_PATH, help='Local SWE-bench Verified parquet')
     parser.add_argument('--instances', type=int, default=None,
                         help='Number of instances to evaluate (default: all 500)')
     parser.add_argument('--start-idx', type=int, default=0,
@@ -301,6 +303,11 @@ def main():
     args = parser.parse_args()
 
     CONFIG_FILE = args.config
+    DATASET_PATH = args.dataset
+    if not Path(DATASET_PATH).is_file():
+        parser.error(f'Dataset not found: {DATASET_PATH}; pass --dataset')
+    if not Path(CONFIG_FILE).is_file():
+        parser.error(f'OpenHands config not found: {CONFIG_FILE}')
     PARSER_BASE_URL = args.parser_base_url
     PARSER_MODEL = args.parser_model
     PARSER_API_KEY = args.parser_api_key

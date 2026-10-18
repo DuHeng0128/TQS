@@ -1,0 +1,5 @@
+# CPU scoring and subset selection. GPU training/evaluation use separate environments.
+numpy>=1.24
+scipy>=1.10
+pandas>=2.0
+pyarrow>=12
