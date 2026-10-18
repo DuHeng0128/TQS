@@ -67,12 +67,13 @@ Input can be JSON, JSONL, parquet, or a directory. Supported formats are `coderf
 
 ### Prepare training data
 
-The released Top-TQS, Bottom-TQS, and Random selections are provided as three
-1,024-ID manifests. Convert the corresponding raw parquet trajectories and train:
+The Top-TQS, Bottom-TQS, and Random training subsets are included in
+[`data/`](data/README.md), with 1,024 trajectories each and matching ID manifests.
+Convert a bundled subset and train:
 
 ```bash
 python training/prepare_dataset.py \
-  --source /path/to/source-trajectory-shards \
+  --source data/top.parquet \
   --ids training/splits/top.txt \
   --output outputs/data/top.jsonl
 
@@ -80,7 +81,7 @@ DATASET_PATH="$PWD/outputs/data/top.jsonl" bash training/train_lora.sh
 ```
 
 See [`training/`](training/README.md) for the Qwen3-Coder-30B-A3B LoRA configuration.
-Raw upstream data and model weights are not bundled.
+Only these selected subsets are bundled; the full upstream corpus and model weights are not.
 
 To select new subsets from your own scores:
 
@@ -158,6 +159,7 @@ Both runs pass the task. The paper's example contrasts a 36-step run scoring 0.7
 | [`examples/`](examples/) | Small synthetic input for CPU scoring |
 | [`docs/data-and-scoring.md`](docs/data-and-scoring.md) | Schemas, token counts, component mapping, and selection |
 | [`training/`](training/) | Selection manifests, agent-data conversion, and 30B-A3B LoRA training |
+| [`data/`](data/README.md) | Top-TQS, Bottom-TQS, and Random training trajectories |
 | [`evaluation/`](evaluation/) | OpenHands/Daytona runner, vLLM launchers, and SWE-bench verification |
 | [`tests/`](tests/) | CPU regression checks for the scoring and selection interfaces |
 

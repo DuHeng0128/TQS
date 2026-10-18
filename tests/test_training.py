@@ -19,7 +19,7 @@ from tqs.cli import _score
 class TrainingTests(unittest.TestCase):
     def test_manifests_match_supplied_release(self):
         checksums = {
-            "top": "2b0aebd8fd874ef29f74c0035d0ead38dc2f0a45071859db0655e935b55b143b",
+            "top": "56e93901cf5e18519147c0c6f42d68fe3ad5d706815206b82504df8d0761a5ff",
             "bottom": "f5a16c1459ca9a7894477b95ba462efaf4e6c85b6127b5023a76735d6e1a1d3e",
             "random": "94a49d3a52514f9ed93eaec2cebaec632469c28d107e80f80e3f9dfa33d064f2",
         }
@@ -29,6 +29,19 @@ class TrainingTests(unittest.TestCase):
             # Normalize Git's platform-specific text checkout convention.
             data = path.read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(hashlib.sha256(data).hexdigest(), checksum)
+
+    def test_bundled_data_matches_manifest_order_and_schema(self):
+        expected = {"top.parquet", "bottom.parquet", "random.parquet"}
+        self.assertEqual({path.name for path in (ROOT / "data").glob("*.parquet")}, expected)
+        for split in ("top", "bottom", "random"):
+            path = ROOT / "data" / f"{split}.parquet"
+            self.assertLess(path.stat().st_size, 50 * 1024 * 1024)
+            schema = pq.ParquetFile(path).schema_arrow
+            self.assertEqual(schema.names, ["trajectory_id", "finish_reason", "image", "messages", "reward", "tools", "license"])
+            rows = pq.read_table(path, columns=["trajectory_id", "reward", "license"]).to_pylist()
+            self.assertEqual([row["trajectory_id"] for row in rows], read_ids(ROOT / "training/splits" / f"{split}.txt"))
+            self.assertEqual(len(rows), 1024)
+            self.assertTrue(all(row["reward"] == 1.0 and row["license"] for row in rows))
 
     def test_assistant_and_tool_call_conversion(self):
         row = {"trajectory_id": "demo", "messages": [

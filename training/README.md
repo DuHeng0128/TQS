@@ -1,13 +1,13 @@
 # Training
 
-The three manifests in [`splits/`](splits/) contain the Top-TQS, Bottom-TQS,
-and Random selections, with 1,024 trajectory IDs each. Use these IDs with the
-original CoderForge-Preview parquet shards; the raw corpus and model weights
-are not duplicated here.
+The three training subsets are bundled as [`data/top.parquet`](../data/top.parquet),
+[`data/bottom.parquet`](../data/bottom.parquet), and
+[`data/random.parquet`](../data/random.parquet), with 1,024 trajectories each.
+The manifests in [`splits/`](splits/) match their row order and trajectory IDs.
 
 ```bash
 python training/prepare_dataset.py \
-  --source /path/to/CoderForge-Preview/trajectories \
+  --source data/top.parquet \
   --ids training/splits/top.txt \
   --output outputs/data/top.jsonl
 
@@ -21,6 +21,9 @@ PyTorch, DeepSpeed and FlashAttention environment on Linux before training.
 The converter preserves assistant text and tool calls as training targets;
 user messages and tool responses are context, masked by `--loss_scale default`.
 It requires every requested ID and refuses to overwrite existing output.
+For another subset, replace both `top.parquet` and `top.txt` with `bottom`
+or `random`. The converter also accepts the original CoderForge-Preview shard
+directory with the same ID manifest.
 
 The launcher uses Qwen3-Coder-30B-A3B-Instruct with LoRA rank 32, alpha 64,
 dropout 0.05, learning rate 2e-5, five epochs, four processes, per-device batch

@@ -16,3 +16,6 @@ checkpoints/
 wandb/
 *.log
 .DS_Store
+top-1k-old/
+top_1k-old/
+.claude/
