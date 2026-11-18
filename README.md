@@ -1,7 +1,7 @@
 <div align="center">
 
 ## TQS
-### Quality, Not Just Outcome: A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning**
+### Quality, Not Just Outcome: A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning
 
 Sida Li · Yuanxin Liu · Shicheng Li · Linli Yao · Xu Sun · Haoli Bai · Xiao-Hui Li
 
