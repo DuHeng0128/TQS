@@ -1,16 +1,14 @@
 <div align="center">
 
-# TQS
-
-### Quality, Not Just Outcome
-**A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning**
+## TQS
+### Quality, Not Just Outcome: A Structural Scoring Framework for Selecting Coding-Agent Trajectories for Supervised Fine-Tuning**
 
 Sida Li · Yuanxin Liu · Shicheng Li · Linli Yao · Xu Sun · Haoli Bai · Xiao-Hui Li
 
-**Findings of EMNLP 2026**
+**EMNLP 2026**
 
 [![arXiv](https://img.shields.io/badge/arXiv-2610.13152-b31b1b.svg)](https://arxiv.org/abs/2610.13152)
-[![Venue](https://img.shields.io/badge/Findings-EMNLP%202026-1f4b99.svg)](https://2026.emnlp.org/)
+[![Venue](https://img.shields.io/badge/Poster-EMNLP%202026-1f4b99.svg)](https://2026.emnlp.org/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
